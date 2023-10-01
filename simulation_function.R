@@ -1,83 +1,8 @@
-library('tbd')
-
 expit <- function(x) exp(x)/(1+exp(x))
 logit <- function(x) log(x/(1-x))
 
-SACE.est <- function(Z,S,Y,X,V,rho=1,need.variance=FALSE){
-  N <- length(Z)
-  if (is.null(X)) X=as.matrix(rep(1,N))
-  SE = NULL
-  SEu = NULL
-  SE.sc = NULL
-  SE.wzr = NULL
-  m.S <- glm(S~., family='binomial', data=data.frame(S,Z,X,V))
-  m.Y <- glm(Y~., family='binomial', data=data.frame(Y,Z,X,V)[S==1,])
-  fit.S.V1 <- predict(m.S, newdata=data.frame(S,Z=1,X,V=1), type='response')
-  fit.S.V0 <- predict(m.S, newdata=data.frame(S,Z=1,X,V=0), type='response')
-  fit.Y1.V1 <- predict(m.Y, newdata=data.frame(Y,Z=1,X,V=1), type='response')
-  fit.Y1.V0 <- predict(m.Y, newdata=data.frame(Y,Z=1,X,V=0), type='response')
-  fit.Y1 <- predict(m.Y, newdata=data.frame(Y,Z=1,X,V), type='response')
-  fit.Y0 <- predict(m.Y, newdata=data.frame(Y,Z=0,X,V), type='response')
-  mu1X <- (rho*fit.S.V1*fit.Y1.V1*(1-fit.S.V0) - fit.S.V0*fit.Y1.V0*(1-fit.S.V1))/
-    (rho*fit.S.V1*(1-fit.S.V0) - fit.S.V0*(1-fit.S.V1))
-  mu0X <- fit.Y0
-  mu1 <- mean(mu1X)
-  mu0 <- mean(mu0X)
-  mu1.sc <- mean(fit.Y1)
-  mu0.sc <- mu0
-  RD <- mu1-mu0
-  RD.sc <- mu1.sc-mu0.sc
-  fit.wzr <- sace(Z,S,Y,X,V,need.variance=FALSE)
-  mu1.wzr <- fit.wzr$mu_1_LL
-  mu0.wzr <- fit.wzr$mu_0_LL
-  RD.wzr <- fit.wzr$sace
-  
-  if (need.variance==TRUE){
-    m.V <- glm(V~., family='binomial', data=data.frame(V,X))
-    m.Z <- glm(Z~., family='binomial', data=data.frame(Z,V,X))
-    fit.V <- predict(m.V, type='response')
-    fit.Z <- predict(m.Z, type='response')
-    fit.S0 <- predict(m.S, newdata=data.frame(S,Z=0,X,V), type='response')
-    p1 = p0111 = (1-fit.V)*fit.Z*fit.S.V0*fit.Y1.V0
-    p2 = p0110 = (1-fit.V)*fit.Z*fit.S.V0*(1-fit.Y1.V0)
-    p3 = p1111 = fit.V*fit.Z*fit.S.V1*fit.Y1.V1
-    p4 = p1110 = fit.V*fit.Z*fit.S.V1*(1-fit.Y1.V1)
-    p5 = p010s = (1-fit.V)*fit.Z*(1-fit.S.V0)
-    p6 = p110s = fit.V*fit.Z*(1-fit.S.V1)
-    p7 = ps011 = (1-fit.Z)*fit.S0*fit.Y0
-    p8 = ps010 = (1-fit.Z)*fit.S0*(1-fit.Y0)
-    p12 = p011s = p1+p2
-    p34 = p111s = p3+p4
-    p56 = ps10s = p5+p6
-    p78 = ps01s = p7+p8
-    ps11s = p12+p34
-    VARX = ((p010s^4*p1111*p1110*p111s
-             +p010s*p110s*ps10s*(p0110*p1111-p1110*p0111)^2
-             -2*p010s^3*p1111*p1110*p011s*p110s
-             +p010s^2*p110s^2*(p0110*p1111*(p0110+p1111)
-                               +p1110*p0111*(p1110+p0111))
-             -2*p110s^3*p0111*p0110*p111s*p010s
-             +p110s^4*p0111*p0110*p011s)/
-              (p111s*p010s-p011s*p110s)^4) + (ps011*ps010/ps01s^3)
-    plaus = (VARX<1)
-    SE = sqrt(VARX[plaus]/sum(plaus))
-    SEu = sqrt(VARX[plaus]/sum(plaus)+var((mu1X-mu0X)[plaus]))
-  }
-  
-  return(list(Z=Z,S=S,Y=Y,X=X,V=V,mu1=mu1,mu0=mu0,sace=RD,
-              mu1.sc=mu1.sc,mu0.sc=mu0,sace.sc=RD.sc,
-              mu1.wzr=mu1.wzr,mu0.wzr=mu0.wzr,sace.wzr=RD.wzr,
-              se=SE,seu=SEu))
-}
-
-
-
-
-
-## SORE, No covariates
-
-sc <- function(Z,S,Y,V,need.variance=FALSE,alpha=0.05){
-  N <- length(Z)
+sc <- function(Z,S,Y,V,need.variance=FALSE,nboot=0,alpha=0.05){
+  N = length(Z)
   p111 = mean(Z==1&S==1&Y==1)
   p110 = mean(Z==1&S==1&Y==0)
   p11s = p111 + p110
@@ -100,14 +25,31 @@ sc <- function(Z,S,Y,V,need.variance=FALSE,alpha=0.05){
     ci_u1 = expit(logit(mu1)+za*sqrt(mean(p11s/(p110*p111*N))))
     ci_l = RD - sqrt((ci_l1-mu1)^2+(ci_u0-mu0)^2)
     ci_u = RD + sqrt((ci_u1-mu1)^2+(ci_l0-mu0)^2)
-    return(list(Z=Z,S=S,Y=Y,V=V,mu1=mu1,mu0=mu0,sace=RD,
+    if (nboot!=0){
+      bt = rep(NA, nboot)
+      for (b in 1:nboot){
+        s = sample(N,replace=TRUE)
+        Zs = Z[s]
+        Ss = S[s]
+        Ys = Y[s]
+        Vs = V[s]
+        bt[b] = sc(Zs,Ss,Ys,Vs,need.variance=FALSE,nboot=0,alpha=0.05)$sace
+      }
+      bt = sort(na.omit(bt))
+      nboot = length(bt)
+      bt_l = bt[alpha/2*nboot]
+      bt_u = bt[(1-alpha/2)*nboot+1]
+      return(list(mu1=mu1,mu0=mu0,sace=RD,
+                  se=SE,ci_l=ci_l,ci_u=ci_u,bt_l=bt_l,bt_u=bt_u))
+    }
+    return(list(mu1=mu1,mu0=mu0,sace=RD,
                 se=SE,ci_l=ci_l,ci_u=ci_u))
   }
   return(list(Z=Z,S=S,Y=Y,V=V,mu1=mu1,mu0=mu0,sace=RD))
 }
 
 sore <- function(Z,S,Y,V,need.variance=FALSE,nboot=0,alpha=0.05){
-  N <- length(Z)
+  N = length(Z)
   p1 = p0111 = mean(V==0&Z==1&S==1&Y==1)
   p2 = p0110 = mean(V==0&Z==1&S==1&Y==0)
   p3 = p1111 = mean(V==1&Z==1&S==1&Y==1)
@@ -196,22 +138,23 @@ sore <- function(Z,S,Y,V,need.variance=FALSE,nboot=0,alpha=0.05){
       Ss = S[s]
       Ys = Y[s]
       Vs = V[s]
-      bt[b] = sore(Zs,Ss,Ys,Vs,need.variance=FALSE,nboot=FALSE,alpha=0.05)$sace
+      bt[b] = sore(Zs,Ss,Ys,Vs,need.variance=FALSE,nboot=0,alpha=0.05)$sace
       }
       bt = sort(na.omit(bt))
       nboot = length(bt)
       bt_l = bt[alpha/2*nboot]
       bt_u = bt[(1-alpha/2)*nboot+1]
-      return(list(Z=Z,S=S,Y=Y,V=V,mu1=mu1,mu0=mu0,sace=RD,
+      return(list(mu1=mu1,mu0=mu0,sace=RD,
                   se=SE,ci_l=ci_l,ci_u=ci_u,bt_l=bt_l,bt_u=bt_u))
     }
-    return(list(Z=Z,S=S,Y=Y,V=V,mu1=mu1,mu0=mu0,sace=RD,
+    return(list(mu1=mu1,mu0=mu0,sace=RD,
                 se=SE,ci_l=ci_l,ci_u=ci_u))
   }
   return(list(Z=Z,S=S,Y=Y,V=V,mu1=mu1,mu0=mu0,sace=RD))
 }
 
-wzr <- function(Z,S,Y,V,need.variance=FALSE,alpha=0.05){
+wzr <- function(Z,S,Y,V,need.variance=FALSE,nboot=0,alpha=0.05){
+  N = length(Z)
   Y[is.na(Y)] = 0
   YS = Y*S
   PLL0 = mean(S[Z==0&V==0])
@@ -225,7 +168,23 @@ wzr <- function(Z,S,Y,V,need.variance=FALSE,alpha=0.05){
   RD = mu1 - mu0
   if (RD>1) RD=1
   if (-1>RD) RD=-1
-  return(list(Z=Z,S=S,Y=Y,V=V,mu1=mu1,mu0=mu0,sace=RD))
+  if (nboot!=0){
+    bt = rep(NA, nboot)
+    for (b in 1:nboot){
+      s = sample(N,replace=TRUE)
+      Zs = Z[s]
+      Ss = S[s]
+      Ys = Y[s]
+      Vs = V[s]
+      bt[b] = wzr(Zs,Ss,Ys,Vs,need.variance=FALSE,nboot=FALSE,alpha=0.05)$sace
+    }
+    bt = sort(na.omit(bt))
+    nboot = length(bt)
+    bt_l = bt[alpha/2*nboot]
+    bt_u = bt[(1-alpha/2)*nboot+1]
+    return(list(mu1=mu1,mu0=mu0,sace=RD,bt_l=bt_l,bt_u=bt_u))
+  }
+  return(list(mu1=mu1,mu0=mu0,sace=RD))
 }
 
 sace <- function(Z,S,Y,V){
