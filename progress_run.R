@@ -27,7 +27,8 @@ c2l <- c(.2, .4, .4, .2, .2)
 # c1l <- c(4,3.5,3,2.5,2)
 # c2l <- c(4,3.5,3,2.5,2)
 
-for (size in sizel){
+size = sizel[2]
+
   restable <- data.frame(Bias=double(),
                          Setting=integer(),
                          Method=character(),stringsAsFactors=FALSE)
@@ -70,5 +71,3 @@ for (size in sizel){
   bp
   # if you need grey:
   #bp + scale_fill_grey(start=0.2, end=0.8) + theme_classic()
-  
-}
