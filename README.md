@@ -12,3 +12,9 @@ Simulation studies
 
 ## variance.R
 Assessment of confidence intervals
+
+## leukemiaPKU.csv
+Leukemia data
+
+## analysis.R
+Data analysis
