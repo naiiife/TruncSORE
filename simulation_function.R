@@ -1,8 +1,12 @@
+library('tbd')
+
 expit <- function(x) exp(x)/(1+exp(x))
 logit <- function(x) log(x/(1-x))
 
+## Survivor case
+
 sc <- function(Z,S,Y,V,need.variance=FALSE,nboot=0,alpha=0.05){
-  N = length(Z)
+  N <- length(Z)
   p111 = mean(Z==1&S==1&Y==1)
   p110 = mean(Z==1&S==1&Y==0)
   p11s = p111 + p110
@@ -48,8 +52,10 @@ sc <- function(Z,S,Y,V,need.variance=FALSE,nboot=0,alpha=0.05){
   return(list(Z=Z,S=S,Y=Y,V=V,mu1=mu1,mu0=mu0,sace=RD))
 }
 
+## SORE
+
 sore <- function(Z,S,Y,V,need.variance=FALSE,nboot=0,alpha=0.05){
-  N = length(Z)
+  N <- length(Z)
   p1 = p0111 = mean(V==0&Z==1&S==1&Y==1)
   p2 = p0110 = mean(V==0&Z==1&S==1&Y==0)
   p3 = p1111 = mean(V==1&Z==1&S==1&Y==1)
@@ -152,6 +158,8 @@ sore <- function(Z,S,Y,V,need.variance=FALSE,nboot=0,alpha=0.05){
   }
   return(list(Z=Z,S=S,Y=Y,V=V,mu1=mu1,mu0=mu0,sace=RD))
 }
+
+## WZR's method in RCT
 
 wzr <- function(Z,S,Y,V,need.variance=FALSE,nboot=0,alpha=0.05){
   N = length(Z)
