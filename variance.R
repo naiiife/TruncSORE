@@ -1,7 +1,6 @@
 
 iter <- 10000
 sizel = c(200,800,3000)
-# size = 200
 
 a1l <- c(.4, .4, .4, .4, .4)  #strength of V
 a2l <- c(.0, .0, .0, .0, .0)  #sensitivity
@@ -9,7 +8,7 @@ b1l <- c(.0, .4, .0, .4, .4)  #extent of nonrandomization
 b2l <- c(.0, .0, .0, .0, .2)  #sensitivity
 c1l <- c(.4, .4, .4, .4, .4)
 c2l <- c(.2, .4, .4, .2, .2)
-
+d1 = d0 = 0
 
 CV = NULL
 WD = NULL
@@ -25,7 +24,7 @@ for (size in sizel){
     cover.z = cover.t = cover.b = 0
     width.z = width.t = width.b = rep(NA,iter)
     for (i in 1:iter){
-      dat = generate(size,a1,a2,b1,b2,c1,c2,seeds=setting*10000+i)
+      dat = generate(size,a1,a2,b1,b2,c1,c2,seeds=setting*10000+i,d1,d0)
       #TrueRD = dat$TrueRD
       TrueRD = 0.2
       Z = dat$Z
