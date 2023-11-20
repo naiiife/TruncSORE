@@ -8,7 +8,7 @@ Generate data
 Different estimators
 
 ## progress_run.R
-Simulation studies
+Simulation studies, sensitivity analyses
 
 ## variance.R
 Assessment of confidence intervals
